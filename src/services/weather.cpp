@@ -59,12 +59,10 @@ float cToF(float c) { return c * 9.0f / 5.0f + 32.0f; }
 
 // ---- US National Weather Service (api.weather.gov) ----
 
-/** GET `url` and parse the JSON body through `filter` (streamed, low memory). */
-bool nwsGet(const String& url, JsonDocument& doc, const JsonDocument& filter) {
-  WiFiClientSecure client;
+/** Open an NWS endpoint with the required headers and GET it. On success the
+ *  body is ready on http.getStream(); the caller owns client/http and ends it. */
+bool nwsOpen(WiFiClientSecure& client, HTTPClient& http, const String& url) {
   client.setInsecure();
-
-  HTTPClient http;
   if (!http.begin(client, url)) {
     return false;
   }
@@ -76,6 +74,16 @@ bool nwsGet(const String& url, JsonDocument& doc, const JsonDocument& filter) {
   const int code = http.GET();
   if (code != HTTP_CODE_OK) {
     Serial.printf("weather(nws): HTTP %d\n", code);
+    return false;
+  }
+  return true;
+}
+
+/** GET `url` and parse the JSON body through `filter` (streamed, low memory). */
+bool nwsGet(const String& url, JsonDocument& doc, const JsonDocument& filter) {
+  WiFiClientSecure client;
+  HTTPClient http;
+  if (!nwsOpen(client, http, url)) {
     http.end();
     return false;
   }
@@ -124,17 +132,8 @@ void classifyNws(const char* desc, Condition* cond, char* label) {
  *  Avoids parsing the ~57 KB station FeatureCollection just to read one id. */
 bool nwsScanStationId(const String& url, char* out, size_t out_len) {
   WiFiClientSecure client;
-  client.setInsecure();
-
   HTTPClient http;
-  if (!http.begin(client, url)) {
-    return false;
-  }
-  http.setUserAgent(kUserAgent);
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.addHeader("Accept-Encoding", "identity");
-  http.setTimeout(15000);
-  if (http.GET() != HTTP_CODE_OK) {
+  if (!nwsOpen(client, http, url)) {
     http.end();
     return false;
   }
