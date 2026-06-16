@@ -8,11 +8,20 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write   # create releases
+  pages: write      # deploy the web installer to GitHub Pages
+  id-token: write   # Pages deployment auth
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,3 +71,26 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- Web installer (ESP Web Tools on GitHub Pages) ---
+      # Same merged image powers both the release and the browser flasher, so
+      # they can't drift.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Assemble web-installer site
+        run: |
+          mkdir -p site
+          cp docs/index.html site/index.html
+          version="${GITHUB_REF_NAME#v}"
+          sed "s/\"version\": *\"[^\"]*\"/\"version\": \"${version}\"/" docs/manifest.json > site/manifest.json
+          cp .pio/build/supermini/firmware-merged.bin site/firmware-merged.bin
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

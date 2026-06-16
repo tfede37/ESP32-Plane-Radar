@@ -14,17 +14,28 @@ Firmware for the **Waveshare ESP32-S3-Touch-LCD-1.28** — a 1.28″ round **GC9
 
 After Wi‑Fi is saved, the device reconnects automatically; the radar runs in the main loop with periodic ADS-B updates (~3 s), and the weather refreshes every 10 minutes while shown.
 
-## Flash the prebuilt firmware (easiest — no build tools)
+## Flash it (easiest — no build tools)
 
-Grab the latest `.bin` from **[Releases](../../releases/latest)** and flash it straight from your browser:
+Flash straight from your browser with the one-click web installer (Chrome or Edge on desktop):
 
-1. Open the **[ESP Web Flasher](https://espressif.github.io/esptool-js/)** in Chrome or Edge.
-2. Plug the board into USB. If it isn't detected, put it in download mode: **hold BOOT, tap RESET, release BOOT**.
-3. Click **Connect** and pick the serial port.
-4. Add `plane-radar-vX.Y.Z.bin` at offset **`0x0`**, set chip to **ESP32-S3**, then **Program**.
-5. On first boot, join the **`PlaneRadar-Setup`** Wi‑Fi and open `http://192.168.4.1` to enter your home latitude/longitude.
+### 👉 [Open the Web Installer](https://turbotime29.github.io/ESP32-Plane-Radar/)
 
-The release `.bin` is a merged image (bootloader + partitions + app), so the single file at `0x0` is all you need. A `.sha256` is provided to verify the download. To build it yourself instead, see [Build from source](#build-from-source).
+1. Plug the board into your computer with USB-C.
+2. Open the link above, click **Connect**, and pick the serial port. (If it isn't detected, put it in download mode: **hold BOOT, tap RESET, release BOOT**, then retry.)
+3. Click **Install** and wait about a minute.
+4. On first boot, join the **`PlaneRadar-Setup`** Wi‑Fi and open `http://192.168.4.1` to enter your home Wi‑Fi and latitude/longitude.
+
+<details>
+<summary>Prefer to flash manually?</summary>
+
+Grab the latest `plane-radar-vX.Y.Z.bin` from **[Releases](../../releases/latest)**, open the
+**[ESP Web Flasher](https://espressif.github.io/esptool-js/)**, connect the board, and add the
+`.bin` at offset **`0x0`** with the chip set to **ESP32-S3**, then **Program**. It's a merged image
+(bootloader + partitions + app), so the single file at `0x0` is all you need; a `.sha256` is provided
+to verify the download.
+</details>
+
+To build it yourself instead, see [Build from source](#build-from-source).
 
 ## Controls
 
