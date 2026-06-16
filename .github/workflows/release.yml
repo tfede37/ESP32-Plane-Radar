@@ -6,6 +6,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Manifest version for a manual (non-tag) run"
+        required: false
+        default: "dev"
 
 permissions:
   contents: write   # create releases
@@ -45,8 +50,8 @@ jobs:
       - name: Install PlatformIO
         run: pip install --upgrade platformio
 
-      - name: Check airport data
-        run: python3 scripts/build_large_airports.py --check
+      - name: Generate airport data
+        run: python3 scripts/build_large_airports.py
 
       - name: Build and merge
         run: |
@@ -65,6 +70,7 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
@@ -83,6 +89,7 @@ jobs:
           mkdir -p site
           cp docs/index.html site/index.html
           version="${GITHUB_REF_NAME#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then version="${{ github.event.inputs.version }}"; fi
           sed "s/\"version\": *\"[^\"]*\"/\"version\": \"${version}\"/" docs/manifest.json > site/manifest.json
           cp .pio/build/supermini/firmware-merged.bin site/firmware-merged.bin
 
