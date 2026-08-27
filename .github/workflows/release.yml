@@ -57,6 +57,8 @@ jobs:
         run: |
           pio run -e supermini
           pio run -t merge -e supermini
+          pio run -e waveshare-28c
+          pio run -t merge -e waveshare-28c
 
       - name: Package release files
         run: |
@@ -67,6 +69,9 @@ jobs:
           mkdir -p dist
           cp .pio/build/supermini/firmware-merged.bin "dist/plane-radar-${VERSION}.bin"
           sha256sum "dist/plane-radar-${VERSION}.bin" > "dist/plane-radar-${VERSION}.bin.sha256"
+          # 2.8C build (480×480 ST7701 board) ships as a separate image
+          cp .pio/build/waveshare-28c/firmware-merged.bin "dist/plane-radar-28c-${VERSION}.bin"
+          sha256sum "dist/plane-radar-28c-${VERSION}.bin" > "dist/plane-radar-28c-${VERSION}.bin.sha256"
           echo "version=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release
@@ -80,7 +85,8 @@ jobs:
 
       # --- Web installer (ESP Web Tools on GitHub Pages) ---
       # Same merged image powers both the release and the browser flasher, so
-      # they can't drift.
+      # they can't drift. ESP Web Tools allows one build per chip family, so the
+      # installer serves the 1.28" image; 2.8C users grab the release asset.
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
