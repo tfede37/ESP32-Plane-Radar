@@ -2,7 +2,10 @@
 
 namespace services::touch {
 
-/** Reset the CST816 controller and start the I2C bus. Call once in setup(). */
+/**
+ * Reset the touch controller (CST816 or GT911, per board) and start the shared
+ * I2C bus. Call once in setup().
+ */
 void init();
 
 /**

@@ -4,6 +4,17 @@
 
 #include <driver/gpio.h>
 
+// --- Board selection -------------------------------------------------------
+// Pins, panel and touch controller live in include/boards/<board>.h.
+// Pick one with a build flag (see platformio.ini):
+//   -DBOARD_WAVESHARE_LCD_28C  -> ESP32-S3-Touch-LCD-2.8C (480×480 ST7701 + GT911)
+//   (default)                  -> ESP32-S3-Touch-LCD-1.28 (240×240 GC9A01 + CST816)
+#if defined(BOARD_WAVESHARE_LCD_28C)
+#include "boards/waveshare_lcd_2_8c.h"
+#else
+#include "boards/waveshare_lcd_1_28.h"
+#endif
+
 namespace config {
 
 // --- Wi-Fi portal ---
@@ -23,46 +34,14 @@ constexpr unsigned long kWifiDownGraceMs = 4000;
 /** Minimum interval between background reconnect tries. */
 constexpr unsigned long kWifiReconnectIntervalMs = 15000;
 
-// --- BOOT button (Waveshare ESP32-S3-Touch-LCD-1.28, active LOW) ---
-// On the S3 board GPIO9 is the display CS, so the user button is the
-// on-board BOOT button on GPIO0 (active LOW, has hardware pull-up).
-constexpr gpio_num_t kBootPin = GPIO_NUM_0;
+// --- BOOT button (kBootPin comes from the board header, active LOW) ---
 constexpr unsigned long kBootResetHoldMs = 3000UL;
 /** Ignore BOOT taps shorter than this (debounce). */
 constexpr unsigned long kBootTapMinMs = 40UL;
 
-// --- Display: GC9A01 1.28" round 240×240 (SPI) ---
-// Pins per the Waveshare ESP32-S3-Touch-LCD-1.28 (see desk-pet.yaml).
-constexpr gpio_num_t kDisplayPinRst = GPIO_NUM_14;
-constexpr gpio_num_t kDisplayPinCs = GPIO_NUM_9;
-constexpr gpio_num_t kDisplayPinDc = GPIO_NUM_8;
-constexpr gpio_num_t kDisplayPinMosi = GPIO_NUM_11;  // display SDA
-constexpr gpio_num_t kDisplayPinSclk = GPIO_NUM_10;  // display SCL
-constexpr gpio_num_t kDisplayPinBacklight = GPIO_NUM_2;  // PWM backlight (active HIGH)
-
-constexpr int kDisplayWidth = 240;
-constexpr int kDisplayHeight = 240;
-
-// Panel alignment: this board's visible window sits a few rows high, clipping
-// the top. Shift all output down by this many px (0 = no shift).
-constexpr int kDisplayOffsetX = 0;
-constexpr int kDisplayOffsetY = 0;
-
-constexpr uint32_t kDisplaySpiWriteHz = 40000000;
-// GC9A01 modules often need invert + BGR for correct black/green output
-constexpr bool kDisplayInvert = true;
-constexpr bool kDisplayRgbOrder = true;
-
 // --- Radar center defaults (overridden via WiFi setup portal) ---
 constexpr double kDefaultRadarLat = 52.3676;
 constexpr double kDefaultRadarLon = 4.9041;
-
-// --- Touchscreen: CST816 (I2C) on the Waveshare board ---
-constexpr gpio_num_t kTouchPinSda = GPIO_NUM_6;
-constexpr gpio_num_t kTouchPinScl = GPIO_NUM_7;
-constexpr gpio_num_t kTouchPinInt = GPIO_NUM_5;
-constexpr gpio_num_t kTouchPinRst = GPIO_NUM_13;
-constexpr uint8_t kTouchI2cAddr = 0x15;
 
 // --- Weather page (Open-Meteo, free, no API key) ---
 /** Refresh current weather at most this often while the page is shown. */

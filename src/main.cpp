@@ -1,5 +1,6 @@
 /**
- * Plane Radar — WiFi setup, then radar UI on the round GC9A01 display.
+ * Plane Radar — WiFi setup, then radar UI on the round display.
+ * Board (panel, touch, pins) is selected at build time — see include/config.h.
  */
 
 #include <Arduino.h>
@@ -100,7 +101,7 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println();
-  Serial.println("Plane Radar");
+  Serial.println("Plane Radar — " BOARD_NAME);
 
   bootButtonInit();
   services::touch::init();

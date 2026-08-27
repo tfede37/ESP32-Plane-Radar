@@ -15,7 +15,7 @@
 #include "ui/radar_theme.h"
 #include "ui/runway_overlay.h"
 
-namespace fonts = lgfx::v1::fonts;
+namespace lgfx_fonts = lgfx::v1::fonts;
 
 namespace ui {
 namespace radar {
@@ -41,9 +41,9 @@ bool s_scale_use_vlw = false;
 float s_cardinal_vlw_size = 0.56f;
 float s_scale_vlw_size = 0.50f;
 float s_tag_vlw_size = 0.56f;
-const lgfx::GFXfont* s_cardinal_gfx = &fonts::FreeSansBold12pt7b;
-const lgfx::GFXfont* s_scale_gfx = &fonts::FreeSansBold9pt7b;
-const lgfx::GFXfont* s_tag_gfx = &fonts::FreeSansBold12pt7b;
+const lgfx::GFXfont* s_cardinal_gfx = &lgfx_fonts::FreeSansBold12pt7b;
+const lgfx::GFXfont* s_scale_gfx = &lgfx_fonts::FreeSansBold9pt7b;
+const lgfx::GFXfont* s_tag_gfx = &lgfx_fonts::FreeSansBold12pt7b;
 
 bool s_tag_label_metrics_ready = false;
 bool s_tag_use_vlw = false;
@@ -67,13 +67,12 @@ class DrawScope {
 int absDiff(int a, int b) { return std::abs(a - b); }
 
 int measureGfxHeight(const lgfx::GFXfont& font) {
-  tft.setFont(&font);
-  tft.setTextSize(1);
+  displayFontSetBitmap(tft, &font);
   return tft.fontHeight();
 }
 
 int measureVlwHeight(float size) {
-  tft.setTextSize(size);
+  displayFontSetSmoothSize(tft, size);
   return tft.fontHeight();
 }
 
@@ -123,16 +122,16 @@ void initLabelMetrics() {
     s_scale_use_vlw = true;
     s_scale_vlw_size = findVlwSizeForHeight(scale_target);
   } else {
-    const lgfx::GFXfont* cardinal_candidates[] = {&fonts::FreeSansBold12pt7b,
-                                                  &fonts::FreeSansBold9pt7b};
+    const lgfx::GFXfont* cardinal_candidates[] = {&lgfx_fonts::FreeSansBold12pt7b,
+                                                  &lgfx_fonts::FreeSansBold9pt7b};
     s_cardinal_gfx =
         pickGfxFontClosest(cardinal_target, cardinal_candidates, 2);
     s_cardinal_use_vlw = false;
 
     const int cardinal_h = measureGfxHeight(*s_cardinal_gfx);
     const int scale_target = cardinal_h - radar::kScaleBelowCardinalPx;
-    const lgfx::GFXfont* scale_candidates[] = {&fonts::FreeSansBold9pt7b,
-                                               &fonts::FreeSansBold12pt7b};
+    const lgfx::GFXfont* scale_candidates[] = {&lgfx_fonts::FreeSansBold9pt7b,
+                                               &lgfx_fonts::FreeSansBold12pt7b};
     s_scale_gfx = pickGfxFontClosest(scale_target, scale_candidates, 2);
     s_scale_use_vlw = false;
   }
@@ -165,8 +164,8 @@ void initTagLabelMetrics() {
     s_tag_use_vlw = true;
     s_tag_vlw_size = findVlwSizeForHeight(target);
   } else {
-    const lgfx::GFXfont* tag_candidates[] = {&fonts::FreeSansBold12pt7b,
-                                               &fonts::FreeSansBold9pt7b};
+    const lgfx::GFXfont* tag_candidates[] = {&lgfx_fonts::FreeSansBold12pt7b,
+                                               &lgfx_fonts::FreeSansBold9pt7b};
     s_tag_gfx = pickGfxFontClosest(target, tag_candidates, 2);
     s_tag_use_vlw = false;
   }
@@ -179,7 +178,8 @@ void initPalette() {
   radar::kColorGrid = tft.color565(radar::kGridR, radar::kGridG, radar::kGridB);
   radar::kColorLabel = tft.color565(255, 255, 255);
   radar::kColorCenter = tft.color565(255, 255, 255);
-  // GC9A01 BGR panel: swap R/B in color565 so logical red renders red on screen.
+  // BGR panels (e.g. the 1.28" GC9A01): swap R/B in color565 so logical red
+  // renders red on screen. Boards that fix the order in hardware set false.
   if (config::kDisplayRgbOrder) {
     radar::kColorAircraft =
         tft.color565(radar::kAircraftB, radar::kAircraftG, radar::kAircraftR);
@@ -665,6 +665,10 @@ bool ensureFrameSprite() {
     return true;
   }
   s_frame.setColorDepth(16);
+#if defined(BOARD_DISPLAY_ST7701_RGB)
+  // 480×480×2 B = 450 KB: far beyond internal RAM, so keep it in PSRAM.
+  s_frame.setPsram(true);
+#endif
   if (!s_frame.createSprite(radar::kSize, radar::kSize)) {
     Serial.println("radar: frame sprite alloc failed");
     return false;
