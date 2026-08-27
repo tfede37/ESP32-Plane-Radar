@@ -38,8 +38,13 @@ void showRadarIfConnected() {
   g_radar_visible = true;
 }
 
-void onRangeTap() {
-  ui::radar::rangeNext();
+/** Step through the range presets; zoom_in picks the next shorter range. */
+void changeRange(bool zoom_in) {
+  if (zoom_in) {
+    ui::radar::rangePrev();
+  } else {
+    ui::radar::rangeNext();
+  }
   char range_label[12];
   ui::radar::formatCurrentRing3Label(range_label, sizeof(range_label));
   Serial.printf("Range: %s (outer ~%.0f km)\n", range_label,
@@ -53,7 +58,7 @@ void onRangeTap() {
 void handleBootButton() {
   bootButtonPollLongPress();
   if (bootButtonConsumeTap()) {
-    onRangeTap();
+    changeRange(false);
   }
 }
 
@@ -79,11 +84,7 @@ void showWeather(bool force_fetch) {
   ui::weatherDisplayDraw();
 }
 
-/** A tap anywhere toggles between the radar and the weather page. */
-void handleTouchToggle() {
-  if (!services::touch::tapped()) {
-    return;
-  }
+void togglePage() {
   if (g_page == Page::Radar) {
     g_page = Page::Weather;
     g_radar_visible = false;  // stop radar from drawing over the weather page
@@ -92,6 +93,54 @@ void handleTouchToggle() {
     g_page = Page::Radar;
     g_radar_visible = false;  // force a fresh radar redraw
     showRadarIfConnected();
+  }
+}
+
+/**
+ * Tap anywhere toggles radar/weather. On the radar, pinching or swiping walks
+ * the range presets: apart/right/up zooms in, together/left/down zooms out.
+ */
+void handleTouch() {
+  using services::touch::Gesture;
+
+  const Gesture gesture = services::touch::consume();
+  if (gesture == Gesture::None) {
+    return;
+  }
+  if (gesture == Gesture::Tap) {
+    togglePage();
+    return;
+  }
+  if (g_page != Page::Radar) {
+    return;  // gestures only steer the radar
+  }
+
+  switch (gesture) {
+    case Gesture::PinchOut:
+    case Gesture::SwipeRight:
+    case Gesture::SwipeUp:
+      changeRange(true);
+      break;
+    case Gesture::PinchIn:
+    case Gesture::SwipeLeft:
+    case Gesture::SwipeDown:
+      changeRange(false);
+      break;
+    default:
+      break;
+  }
+}
+
+/**
+ * Samples touch and BOOT independently of the main loop: an ADS-B fetch plus a
+ * full repaint can block it for seconds, which used to swallow taps and replay
+ * them later (the weather page appearing "by itself").
+ */
+void inputTask(void*) {
+  for (;;) {
+    services::touch::update();
+    bootButtonSample();
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
 
@@ -106,6 +155,7 @@ void setup() {
   bootButtonInit();
   services::touch::init();
   displayInit();
+  xTaskCreatePinnedToCore(inputTask, "input", 3072, nullptr, 2, nullptr, 1);
   if (wifiShowsSetupScreenOnBoot()) {
     statusScreenPortal();
   }
@@ -119,7 +169,7 @@ void setup() {
 
 void loop() {
   handleBootButton();
-  handleTouchToggle();
+  handleTouch();
 
   if (g_page == Page::Weather) {
     // Keep the weather page refreshed; retry sooner if we have no data yet.

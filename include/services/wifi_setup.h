@@ -10,9 +10,11 @@ bool wifiReconnect();
 /** Keeps the LAN config portal alive; call every loop() iteration. */
 void wifiLoop();
 bool wifiBootButtonPressed();
-/** GPIO + interrupt setup; call once early in setup(). */
+/** GPIO setup; call once early in setup(). */
 void bootButtonInit();
+/** One debounced sample of the BOOT pin; safe from any task, call often. */
+void bootButtonSample();
 /** Latched short tap (survives blocking HTTP/display work). */
 bool bootButtonConsumeTap();
-/** Call each loop iteration; triggers WiFi reset on long hold. */
+/** Call each loop iteration; runs the WiFi reset once a long hold is latched. */
 void bootButtonPollLongPress();

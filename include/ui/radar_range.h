@@ -36,8 +36,10 @@ constexpr size_t kRangePresetCount =
 
 /** Load saved range and distance units from flash. Call once after boot. */
 void rangeInit();
-/** Cycle preset and save to flash. */
+/** Cycle to the next longer range preset and save to flash. */
 void rangeNext();
+/** Cycle to the next shorter range preset and save to flash. */
+void rangePrev();
 const RangePreset& rangeCurrent();
 uint8_t rangeIndex();
 /** ADSB fetch radius (km): scaled to screen edge so beyond-ring dots have data. */

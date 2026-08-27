@@ -51,10 +51,21 @@ To build it yourself instead, see [Build from source](#build-from-source).
 | Input | Effect |
 |-------|--------|
 | **Tap screen** | Toggle between radar and weather page |
+| **Pinch out / swipe right / swipe up** (radar) | Zoom in — next shorter range |
+| **Pinch in / swipe left / swipe down** (radar) | Zoom out — next longer range |
 | **BOOT short tap** | Cycle range preset (5 → 10 → 15 → 25 km); saved to flash |
 | **BOOT hold 3 s** | Clear Wi‑Fi, location, and units; reboot into setup portal |
 
 BOOT is the on-board button on **GPIO 0** (active LOW). During setup you can also hold BOOT at power-on to force a credential reset.
+
+Touch and BOOT are sampled by a dedicated input task every 20 ms, so gestures register even while the loop is busy with an ADS-B fetch or a full repaint. Pinch needs a multi-touch controller (GT911 on the 2.8C); the 1.28″ CST816 is single-touch, so use swipes there. The touch IC is probed at boot (GT911 at `0x5D`/`0x14`, CST816 family at `0x15`) and every gesture is logged over serial — the quickest way to see what the panel actually reported:
+
+```
+touch: controller GT911 @0x5D
+touch: swipe-left (392,208 -> 96,214, 1 finger)
+Range: 15km (outer ~20 km)
+BOOT: tap (118 ms)
+```
 
 ## Weather page
 
@@ -143,7 +154,7 @@ Behavior lives in **`include/config.h`**, hardware in **`include/boards/<board>.
 | Display bus | pins, `kDisplayInvert`, `kDisplayRgbOrder`, `kDisplaySpiWriteHz` (1.28) / RGB pins + timings, `kRgbSwapRedBlue` (2.8C) |
 | Display offset | `kDisplayOffsetX/Y` — shift output to clear the bezel if needed |
 | Backlight | `kDisplayBrightness` (0-255) |
-| Touch | `kTouchPinSda/Scl/Int/Rst`, `kTouchI2cAddr` |
+| Touch | `kTouchPinSda/Scl/Int/Rst`; the controller (GT911 / CST816) is probed at boot |
 | UI scale | `include/ui/ui_scale.h` — everything is derived from `kDisplayWidth` |
 | Weather | `kWeatherFetchIntervalMs`, `kWeatherRetryIntervalMs` |
 | BOOT | `kBootPin`, `kBootResetHoldMs`, `kBootTapMinMs` |

@@ -18,38 +18,75 @@
 #include "ui/radar_range.h"
 #include "ui/status_screens.h"
 
+// BOOT button: sampled with debounce instead of an interrupt. An earlier
+// version mixed an ISR with level polling, and the poll could clear the state
+// the ISR had just latched (during contact bounce), swallowing the release —
+// which is where taps used to get lost. Sampling happens both from the main
+// loop and from the input task, so a press is still seen while the loop is
+// blocked in an HTTP fetch or a full radar repaint.
 portMUX_TYPE s_boot_mux = portMUX_INITIALIZER_UNLOCKED;
 volatile bool s_boot_tap_pending = false;
-volatile bool s_boot_is_down = false;
-volatile unsigned long s_boot_down_ms = 0;
-bool s_long_press_handled = false;
-bool s_boot_interrupt_attached = false;
+volatile bool s_boot_long_pending = false;
 
-void IRAM_ATTR onBootButtonIsr() {
-  const bool down = digitalRead(config::kBootPin) == LOW;
-  const unsigned long now = millis();
-  portENTER_CRITICAL_ISR(&s_boot_mux);
-  if (down) {
-    s_boot_is_down = true;
-    s_boot_down_ms = now;
-  } else if (s_boot_is_down) {
-    const unsigned long held = now - s_boot_down_ms;
-    if (held >= config::kBootTapMinMs && held < config::kBootResetHoldMs) {
-      s_boot_tap_pending = true;
-    }
-    s_boot_is_down = false;
-  }
-  portEXIT_CRITICAL_ISR(&s_boot_mux);
-}
+/** Debounce window: the level must hold this long before a change is taken. */
+constexpr unsigned long kBootDebounceMs = 25;
+
+bool s_boot_ready = false;
+bool s_boot_state_down = false;      // debounced state
+bool s_boot_raw_last = false;        // last raw sample
+unsigned long s_boot_raw_since = 0;  // when the raw level last changed
+unsigned long s_boot_down_since = 0;
+bool s_boot_long_fired = false;
+bool s_long_press_handled = false;
 
 void initBootButton() {
   pinMode(config::kBootPin, INPUT_PULLUP);
-  if (s_boot_interrupt_attached) {
+  s_boot_ready = true;
+}
+
+/**
+ * One debounced sample. Called both by the input task and by the main loop, so
+ * the whole state machine runs inside the spinlock; logging happens after it.
+ */
+void bootButtonSample() {
+  if (!s_boot_ready) {
     return;
   }
-  attachInterrupt(digitalPinToInterrupt(static_cast<uint8_t>(config::kBootPin)),
-                  onBootButtonIsr, CHANGE);
-  s_boot_interrupt_attached = true;
+  const bool raw = digitalRead(config::kBootPin) == LOW;
+  const unsigned long now = millis();
+  unsigned long tap_ms = 0;
+
+  portENTER_CRITICAL(&s_boot_mux);
+  if (raw != s_boot_raw_last) {
+    s_boot_raw_last = raw;
+    s_boot_raw_since = now;
+  } else if (now - s_boot_raw_since >= kBootDebounceMs) {
+    if (raw == s_boot_state_down) {
+      // Steady press: arm the long-hold action once the threshold is crossed.
+      if (s_boot_state_down && !s_boot_long_fired &&
+          now - s_boot_down_since >= config::kBootResetHoldMs) {
+        s_boot_long_fired = true;
+        s_boot_long_pending = true;
+      }
+    } else {
+      s_boot_state_down = raw;
+      if (raw) {
+        s_boot_down_since = now;
+        s_boot_long_fired = false;
+      } else {
+        const unsigned long held = now - s_boot_down_since;
+        if (!s_boot_long_fired && held >= config::kBootTapMinMs) {
+          s_boot_tap_pending = true;
+          tap_ms = held;
+        }
+      }
+    }
+  }
+  portEXIT_CRITICAL(&s_boot_mux);
+
+  if (tap_ms != 0) {
+    Serial.printf("BOOT: tap (%lu ms)\n", tap_ms);
+  }
 }
 
 namespace {
@@ -377,26 +414,19 @@ bool bootButtonConsumeTap() {
 }
 
 void bootButtonPollLongPress() {
-  if (wifiBootButtonPressed()) {
-    portENTER_CRITICAL(&s_boot_mux);
-    if (!s_boot_is_down) {
-      s_boot_is_down = true;
-      s_boot_down_ms = millis();
-    }
-    const unsigned long down_ms = s_boot_down_ms;
-    portEXIT_CRITICAL(&s_boot_mux);
+  bootButtonSample();
 
-    if (!s_long_press_handled &&
-        millis() - down_ms >= config::kBootResetHoldMs) {
-      s_long_press_handled = true;
-      Serial.println("BOOT held — resetting WiFi");
-      wifiResetCredentialsAndReboot();
-    }
-  } else {
-    portENTER_CRITICAL(&s_boot_mux);
-    s_boot_is_down = false;
-    portEXIT_CRITICAL(&s_boot_mux);
-    s_long_press_handled = false;
+  portENTER_CRITICAL(&s_boot_mux);
+  const bool long_press = s_boot_long_pending;
+  s_boot_long_pending = false;
+  portEXIT_CRITICAL(&s_boot_mux);
+
+  // The reset draws a screen and reboots, so it always runs on the caller's
+  // thread (main loop or portal loop), never on the input task.
+  if (long_press && !s_long_press_handled) {
+    s_long_press_handled = true;
+    Serial.println("BOOT held — resetting WiFi");
+    wifiResetCredentialsAndReboot();
   }
 }
 
