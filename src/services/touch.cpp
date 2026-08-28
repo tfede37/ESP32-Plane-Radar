@@ -206,10 +206,16 @@ void detectController() {
     s_controller = Controller::GT911;
     uint8_t id[4] = {0};
     if (gtRead(kGtRegProductId, id, sizeof(id))) {
+      // The product ID is an ASCII string ("911"), NUL padded to four bytes.
+      char digits[5] = {0};
+      size_t n = 0;
+      for (const uint8_t c : id) {
+        if (c >= 0x20 && c < 0x7F) {
+          digits[n++] = static_cast<char>(c);
+        }
+      }
       static char name[24];
-      snprintf(name, sizeof(name), "GT%c%c%c%c @0x%02X", id[0] ? id[0] : '?',
-               id[1] ? id[1] : '?', id[2] ? id[2] : '?', id[3] ? id[3] : '?',
-               addr);
+      snprintf(name, sizeof(name), "GT%s @0x%02X", n ? digits : "?", addr);
       s_controller_name = name;
       gtWrite(kGtRegStatus, 0x00);
       return;
