@@ -58,6 +58,8 @@ To build it yourself instead, see [Build from source](#build-from-source).
 
 BOOT is the on-board button on **GPIO 0** (active LOW). During setup you can also hold BOOT at power-on to force a credential reset.
 
+At boot the panel shows a splash with the firmware version, the board and the touch controller that answered on the bus, so the hardware can be checked without a serial console. Range changes and BOOT presses are confirmed by a short label on screen.
+
 Touch and BOOT are sampled by a dedicated input task every 20 ms, so gestures register even while the loop is busy with an ADS-B fetch or a full repaint. Pinch needs a multi-touch controller (GT911 on the 2.8C); the 1.28″ CST816 is single-touch, so use swipes there. The touch IC is probed at boot (GT911 at `0x5D`/`0x14`, CST816 family at `0x15`) and every gesture is logged over serial — the quickest way to see what the panel actually reported:
 
 ```

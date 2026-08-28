@@ -21,6 +21,7 @@
 #define BOARD_HAS_IO_EXPANDER 1
 /** Twice the pixel density of the 1.28" layout: use the 30 px smooth font. */
 #define BOARD_UI_FONT_30PX 1
+#define BOARD_SHORT_NAME "ESP32-S3 Touch LCD 2.8C"
 #define BOARD_NAME "Waveshare ESP32-S3-Touch-LCD-2.8C"
 
 namespace config {

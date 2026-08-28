@@ -14,6 +14,7 @@
 
 #define BOARD_DISPLAY_GC9A01_SPI 1
 #define BOARD_TOUCH_CST816 1
+#define BOARD_SHORT_NAME "ESP32-S3 Touch LCD 1.28"
 #define BOARD_NAME "Waveshare ESP32-S3-Touch-LCD-1.28"
 
 namespace config {

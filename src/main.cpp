@@ -55,10 +55,18 @@ void changeRange(bool zoom_in) {
   }
 }
 
+/** Confirms a range change on the panel: the label survives the repaint. */
+void showRangeToast() {
+  char label[12];
+  ui::radar::formatCurrentRing3Label(label, sizeof(label));
+  statusScreenToast(label);
+}
+
 void handleBootButton() {
   bootButtonPollLongPress();
   if (bootButtonConsumeTap()) {
     changeRange(false);
+    showRangeToast();
   }
 }
 
@@ -129,6 +137,7 @@ void handleTouch() {
     default:
       break;
   }
+  showRangeToast();
 }
 
 /**
@@ -155,7 +164,11 @@ void setup() {
   bootButtonInit();
   services::touch::init();
   displayInit();
+  // On-screen boot info: version, board and the touch IC that answered, so the
+  // hardware can be checked without hooking up a serial console.
+  statusScreenBootInfo(services::touch::controllerName());
   xTaskCreatePinnedToCore(inputTask, "input", 3072, nullptr, 2, nullptr, 1);
+  delay(2000);
   if (wifiShowsSetupScreenOnBoot()) {
     statusScreenPortal();
   }

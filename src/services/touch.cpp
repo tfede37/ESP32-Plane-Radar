@@ -241,9 +241,7 @@ void detectController() {
 // ---------------------------------------------------------------------------
 
 // Thresholds in 240 px design units, scaled to the panel.
-const int kTapMaxTravelPx = ui::scaled(20);
 const int kSwipeMinTravelPx = ui::scaled(45);
-constexpr unsigned long kTapMaxMs = 700;
 constexpr unsigned long kContactMinMs = 30;
 constexpr float kPinchMinRatio = 1.25f;
 
@@ -318,10 +316,10 @@ Gesture classifyRelease(unsigned long now) {
     return dy > 0 ? Gesture::SwipeDown : Gesture::SwipeUp;
   }
 
-  if (held <= kTapMaxMs && adx <= kTapMaxTravelPx && ady <= kTapMaxTravelPx) {
-    return Gesture::Tap;
-  }
-  return Gesture::None;
+  // Anything else that stayed put is a tap, however long it was held: there is
+  // no long-press action on screen, and silently dropping a slow press just
+  // looks like a dead touchscreen.
+  return Gesture::Tap;
 }
 
 }  // namespace

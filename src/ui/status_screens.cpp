@@ -209,6 +209,47 @@ void statusScreenConnectingTick() {
   drawSpinnerDots();
 }
 
+void statusScreenBootInfo(const char* touch_controller) {
+  const char* touch = (touch_controller != nullptr) ? touch_controller : "?";
+  static char touch_line[40];
+  snprintf(touch_line, sizeof(touch_line), "Touch: %s", touch);
+
+  const TextLine lines[] = {
+      {"Plane Radar", 1.15f, &kPortalGfxTitle},
+      {config::kFirmwareVersion, 1.0f, &kPortalGfxBody},
+      {BOARD_SHORT_NAME, 0.8f, &kConnectingGfxDetail},
+      {touch_line, 0.8f, &kConnectingGfxDetail},
+  };
+  drawTextBlock(config::kColorBlack, config::kTextOnBlack, lines,
+                sizeof(lines) / sizeof(lines[0]));
+}
+
+void statusScreenToast(const char* text) {
+  if (text == nullptr || text[0] == '\0') {
+    return;
+  }
+  displayFontEnsureLoaded(tft);
+  if (displayFontIsSmooth()) {
+    displayFontSetSmoothSize(tft, 0.8f);
+  } else {
+    displayFontSetBitmap(tft, &kConnectingGfxDetail);
+  }
+
+  const int pad_x = ui::scaled(10);
+  const int pad_y = ui::scaled(4);
+  const int h = tft.fontHeight();
+  const int w = tft.textWidth(text) + pad_x * 2;
+  // Kept inside the round bezel rather than at the very bottom edge.
+  const int cy = config::kDisplayHeight * 78 / 100;
+
+  tft.fillRoundRect(kCenterX - w / 2, cy - h / 2 - pad_y, w, h + pad_y * 2,
+                    ui::scaled(5), config::kColorBlack);
+  tft.setTextDatum(textdatum_t::middle_center);
+  tft.setTextColor(config::kTextOnBlack, config::kColorBlack);
+  tft.drawString(text, kCenterX, cy);
+  tft.setTextDatum(textdatum_t::top_left);
+}
+
 void statusScreenPortal() {
   const TextLine lines[] = {
       {"Wi-Fi setup", 1.15f, &kPortalGfxTitle},
