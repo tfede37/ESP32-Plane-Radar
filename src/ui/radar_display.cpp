@@ -489,8 +489,11 @@ void sortBeyondDotsFarFirst(BeyondDotDrawItem* items, size_t count) {
 void drawAircraft() {
   initLabelMetrics();
 
-  const size_t n = services::adsb::aircraftCount();
-  const services::adsb::Aircraft* planes = services::adsb::aircraftList();
+  // The fetch runs on its own task: work from a copy so the list cannot change
+  // halfway through a frame. Static, not stack: ~3 KB.
+  static services::adsb::Aircraft planes[services::adsb::kMaxAircraft];
+  const size_t n =
+      services::adsb::snapshot(planes, services::adsb::kMaxAircraft);
 
   AircraftDrawItem items[services::adsb::kMaxAircraft];
   BeyondDotDrawItem dots[services::adsb::kMaxAircraft];
@@ -681,6 +684,7 @@ bool ensureFrameSprite() {
 // sprite, then blit it to the panel in a single pushSprite. Because the panel
 // is updated in one pass, labels never show an erase/redraw gap — no flicker.
 void renderFrame() {
+  const unsigned long start_ms = millis();
   drawStaticGrid(s_frame);  // opens its own DrawScope(s_frame)
   {
     const DrawScope scope(s_frame);
@@ -688,6 +692,8 @@ void renderFrame() {
   }
   s_frame.pushSprite(0, 0);
   tft.setTextDatum(textdatum_t::top_left);
+  // The repaint is the only thing left blocking the loop, so keep it visible.
+  Serial.printf("radar: frame %lu ms\n", millis() - start_ms);
 }
 
 }  // namespace

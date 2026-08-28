@@ -36,4 +36,11 @@ bool tapped();
 /** Log line describing the detected controller (for diagnostics). */
 const char* controllerName();
 
+/**
+ * Last contact as text — gesture, travel in pixels, finger count, and whether
+ * coordinates were available: "swipe-left d172 n1". Used by the on-screen
+ * diagnostics while the port is being validated on real hardware.
+ */
+const char* lastEventText();
+
 }  // namespace services::touch

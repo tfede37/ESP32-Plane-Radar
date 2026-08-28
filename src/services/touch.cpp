@@ -265,6 +265,8 @@ float s_pinch_max = 0.0f;
 
 portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 volatile Gesture s_pending = Gesture::None;
+/** Last contact in plain text, e.g. "swipe-left d172 n1" — shown on screen. */
+char s_last_event[32] = "";
 
 const char* gestureName(Gesture g) {
   switch (g) {
@@ -413,6 +415,10 @@ void update() {
   if (g == Gesture::None) {
     return;
   }
+  const int travel = static_cast<int>(lroundf(distance(s_start, s_last)));
+  snprintf(s_last_event, sizeof(s_last_event), "%s d%d n%d%s", gestureName(g),
+           s_have_coords ? travel : -1, s_max_fingers,
+           s_have_coords ? "" : " nocoord");
   Serial.printf("touch: %s (%d,%d -> %d,%d, %d finger%s)\n", gestureName(g),
                 s_start.x, s_start.y, s_last.x, s_last.y, s_max_fingers,
                 s_max_fingers == 1 ? "" : "s");
@@ -430,5 +436,7 @@ Gesture consume() {
 bool tapped() { return consume() == Gesture::Tap; }
 
 const char* controllerName() { return s_controller_name; }
+
+const char* lastEventText() { return s_last_event; }
 
 }  // namespace services::touch

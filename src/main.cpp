@@ -24,9 +24,12 @@ enum class Page { Radar, Weather };
 
 bool g_radar_visible = false;
 Page g_page = Page::Radar;
+/** Set by the ADS-B task when a new sweep is ready to be drawn. */
+volatile bool g_adsb_dirty = false;
+/** Radar page only: pauses the fetch task while the weather page is up. */
+volatile bool g_adsb_wanted = false;
 unsigned long g_wifi_down_since = 0;
 unsigned long g_last_reconnect_ms = 0;
-unsigned long g_last_adsb_fetch_ms = 0;
 unsigned long g_last_weather_fetch_ms = 0;
 
 void showRadarIfConnected() {
@@ -37,6 +40,8 @@ void showRadarIfConnected() {
   ui::radarDisplayDraw();
   g_radar_visible = true;
 }
+
+void setAdsbEnabled(bool enabled) { g_adsb_wanted = enabled; }
 
 /** Step through the range presets; zoom_in picks the next shorter range. */
 void changeRange(bool zoom_in) {
@@ -70,15 +75,27 @@ void handleBootButton() {
   }
 }
 
-void fetchAndDrawAircraft() {
-  const float fetch_km = ui::radar::fetchRadiusKm();
-  if (!services::adsb::fetchUpdate(services::location::lat(),
-                                   services::location::lon(), fetch_km)) {
-    handleBootButton();
-    return;
+/**
+ * ADS-B polling lives on its own task: the HTTP round trip takes seconds, and
+ * running it from loop() made taps and BOOT presses queue up behind it.
+ */
+void adsbTask(void*) {
+  unsigned long last_fetch_ms = 0;
+  bool fetched_once = false;
+  for (;;) {
+    const bool due = !fetched_once ||
+                     millis() - last_fetch_ms >= config::kAdsbFetchIntervalMs;
+    if (g_adsb_wanted && due && WiFi.status() == WL_CONNECTED) {
+      last_fetch_ms = millis();
+      fetched_once = true;
+      const float fetch_km = ui::radar::fetchRadiusKm();
+      if (services::adsb::fetchUpdate(services::location::lat(),
+                                      services::location::lon(), fetch_km)) {
+        g_adsb_dirty = true;
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
   }
-  ui::radarDisplayRefreshAircraft();
-  handleBootButton();
 }
 
 /** Fetch (if connected) and draw the weather page. */
@@ -95,12 +112,15 @@ void showWeather(bool force_fetch) {
 void togglePage() {
   if (g_page == Page::Radar) {
     g_page = Page::Weather;
+    setAdsbEnabled(false);
     g_radar_visible = false;  // stop radar from drawing over the weather page
     showWeather(true);
   } else {
     g_page = Page::Radar;
     g_radar_visible = false;  // force a fresh radar redraw
     showRadarIfConnected();
+    g_adsb_dirty = false;
+    setAdsbEnabled(true);
   }
 }
 
@@ -115,6 +135,8 @@ void handleTouch() {
   if (gesture == Gesture::None) {
     return;
   }
+  statusScreenToast(services::touch::lastEventText());
+
   if (gesture == Gesture::Tap) {
     togglePage();
     return;
@@ -137,7 +159,6 @@ void handleTouch() {
     default:
       break;
   }
-  showRangeToast();
 }
 
 /**
@@ -175,9 +196,12 @@ void setup() {
   services::location::init();
   ui::radar::rangeInit();
 
+  xTaskCreatePinnedToCore(adsbTask, "adsb", 8192, nullptr, 1, nullptr, 0);
+
   if (wifiSetupConnect()) {
     showRadarIfConnected();
   }
+  setAdsbEnabled(g_page == Page::Radar);
 }
 
 void loop() {
@@ -221,9 +245,9 @@ void loop() {
     g_wifi_down_since = 0;
     if (!g_radar_visible) {
       showRadarIfConnected();
-    } else if (millis() - g_last_adsb_fetch_ms >= config::kAdsbFetchIntervalMs) {
-      g_last_adsb_fetch_ms = millis();
-      fetchAndDrawAircraft();
+    } else if (g_adsb_dirty) {
+      g_adsb_dirty = false;
+      ui::radarDisplayRefreshAircraft();
     }
   }
 

@@ -18,7 +18,7 @@
 namespace config {
 
 /** Shown on the boot splash so the flashed build is identifiable on-device. */
-constexpr char kFirmwareVersion[] = "0.3alfa";
+constexpr char kFirmwareVersion[] = "0.4alfa";
 
 // --- Wi-Fi portal ---
 constexpr char kPortalApName[] = "PlaneRadar-Setup";

@@ -20,6 +20,27 @@ constexpr unsigned long kRequestTimeoutMs = 10000;
 
 Aircraft s_aircraft[kMaxAircraft];
 size_t s_aircraft_count = 0;
+/** Parsed here first, then published under the lock (see snapshot()). */
+Aircraft s_parsed[kMaxAircraft];
+
+SemaphoreHandle_t listMutex() {
+  static SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
+  return mutex;
+}
+
+void publish(size_t count) {
+  SemaphoreHandle_t mutex = listMutex();
+  if (mutex != nullptr) {
+    xSemaphoreTake(mutex, portMAX_DELAY);
+  }
+  if (count > 0) {
+    memcpy(s_aircraft, s_parsed, count * sizeof(Aircraft));
+  }
+  s_aircraft_count = count;
+  if (mutex != nullptr) {
+    xSemaphoreGive(mutex);
+  }
+}
 PollFn s_poll_fn = nullptr;
 
 void pollNetwork() {
@@ -205,6 +226,21 @@ size_t aircraftCount() { return s_aircraft_count; }
 
 const Aircraft* aircraftList() { return s_aircraft; }
 
+size_t snapshot(Aircraft* out, size_t max) {
+  SemaphoreHandle_t mutex = listMutex();
+  if (mutex != nullptr) {
+    xSemaphoreTake(mutex, portMAX_DELAY);
+  }
+  const size_t count = s_aircraft_count < max ? s_aircraft_count : max;
+  if (count > 0) {
+    memcpy(out, s_aircraft, count * sizeof(Aircraft));
+  }
+  if (mutex != nullptr) {
+    xSemaphoreGive(mutex);
+  }
+  return count;
+}
+
 bool fetchUpdate(double center_lat, double center_lon, float fetch_radius_km) {
   const float dist_nm = kmToNauticalMiles(fetch_radius_km);
 
@@ -249,7 +285,7 @@ bool fetchUpdate(double center_lat, double center_lon, float fetch_radius_km) {
 
   JsonArray ac = doc["ac"].as<JsonArray>();
   if (ac.isNull()) {
-    s_aircraft_count = 0;
+    publish(0);
     return true;
   }
 
@@ -265,16 +301,16 @@ bool fetchUpdate(double center_lat, double center_lon, float fetch_radius_km) {
       continue;
     }
 
-    s_aircraft[n].lat = plane["lat"].as<float>();
-    s_aircraft[n].lon = plane["lon"].as<float>();
-    s_aircraft[n].nose_deg = pickNoseHeading(plane);
-    s_aircraft[n].track_deg = pickTrackHeading(plane);
-    s_aircraft[n].gs_knots = pickGroundSpeed(plane);
-    fillTagFields(&s_aircraft[n], plane);
+    s_parsed[n].lat = plane["lat"].as<float>();
+    s_parsed[n].lon = plane["lon"].as<float>();
+    s_parsed[n].nose_deg = pickNoseHeading(plane);
+    s_parsed[n].track_deg = pickTrackHeading(plane);
+    s_parsed[n].gs_knots = pickGroundSpeed(plane);
+    fillTagFields(&s_parsed[n], plane);
     ++n;
   }
 
-  s_aircraft_count = n;
+  publish(n);
   Serial.printf("adsb: %u aircraft\n", static_cast<unsigned>(n));
   return true;
 }
